@@ -4,12 +4,17 @@ from flask import abort # To throw error 404s
 from flask import make_response
 from flask import request # Allows us to make requests
 from flask import url_for # Top help make a more user-friendly interface
+from flask_httpauth import HTTPBasicAuth # Adding authentication to Flask
 
+
+# Start up a flask app
 app = Flask(__name__)
+
+# Add some encryption
+auth = HTTPBasicAuth()
 
 # We won't use a database for this demo project because it's a simply to do app
 # Don't do this for larger projects, as this method only works on a single process
-
 tasks = [
     {
         'id': 1,
@@ -25,6 +30,8 @@ tasks = [
     }
 ]
 
+# --------------------------------- Helper functions ----------------------------
+
 # Taking a task from our database and creating a new task w/ id being replaced by uri
 # URI is more user friendly than id
 def make_public_task(task):
@@ -36,12 +43,27 @@ def make_public_task(task):
 			new_task[field] = task[field]
 	return new_task
 
+# Authentications - assuming there's only one user
+@auth.get_password
+def get_password(username):
+	if username == 'Admin':
+		return 'Password'
+	return None 
+
+# Throw error 401 if there's unauthorized access and return a JSON response
+@auth.error_handler
+def unauthorized():
+	return make_response(jsonify({'error': 'Unauthorized access'}), 401)
+
 # ------------------------------------ GET requests ------------------------
+
 # Get a json response of all the tasks
 # We now use make_public_task
 @app.route('/todo/api/v1.0/tasks', methods=['GET'])
+@auth.login_required
 def get_tasks():
-    return jsonify({'tasks': [make_public_task(task) for task in tasks]})
+    #return jsonify({'tasks': [make_public_task(task) for task in tasks]})
+    return jsonify({'tasks': tasks})
 
 # Get a specific task by id
 #The addition of <int:task_id> tells Flask that it expects an integer which is the parameter, task_id 
@@ -54,6 +76,7 @@ def get_task(task_id):
 	return jsonify({'task': task[0]})
 
 # ------------------------------------ POST requests ---------------------------
+
 # Inserting item into our todo lost via POST
 @app.route('/todo/api/v1.0/tasks', methods=['POST'])
 def create_task():
@@ -71,6 +94,7 @@ def create_task():
 	return jsonify({'task': task}), 201
 
 # ------------------------------------- PUT requests ----------------------------
+
 # Update first of the tasks with the ID given
 @app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['PUT'])
 def update_task(task_id):
@@ -97,6 +121,7 @@ def update_task(task_id):
 	return jsonify({'task': task[0]})
 
 # ----------------------------------- DELETE requests -----------------------------
+
 @app.route('/todo/api/v1.0/tasks/<int:task_id>', methods=['DELETE'])
 def delete_task(task_id):
 	task = [tasl for task in tasks if task['id']==task_id]
@@ -112,5 +137,9 @@ def delete_task(task_id):
 def not_found(error):
 	return make_response(jsonify({'error': 'Not found'}), 404)
 
+# ----------------------------------- Start --------------------------------------
+
 if __name__ == '__main__':
-    app.run(debug=True)
+	#app.config['TESTING'] = False
+	print('Bleh')
+	app.run(debug=False)
